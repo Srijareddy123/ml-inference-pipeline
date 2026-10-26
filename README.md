@@ -1,6 +1,6 @@
 # ML Inference Pipeline
 
-An XGBoost machine failure classifier on the public AI4I 2020 dataset, served with FastAPI, with an MLflow registry (promote and rollback), prediction logging to PostgreSQL and KS-test drift alerts to a webhook.
+A personal project: an XGBoost machine failure classifier on the public AI4I 2020 dataset, served with FastAPI, with an MLflow registry (promote and rollback), prediction logging to PostgreSQL and KS-test drift alerts to a webhook.
 
 Topics: `mlops` `xgboost` `fastapi` `mlflow` `predictive-maintenance` `drift-detection` `docker-compose` `postgresql`
 
