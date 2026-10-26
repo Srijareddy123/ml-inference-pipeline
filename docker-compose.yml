@@ -1,0 +1,73 @@
+# Full stack: PostgreSQL, MLflow server, a one-shot training job, and the API.
+# `docker compose up --build` trains on the committed AI4I csv, then serves on :8000.
+# Set ALERT_WEBHOOK_URL in .env to receive drift alerts.
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:-mlpipeline}:${POSTGRES_PASSWORD:-mlpipeline}@postgres:5432/${POSTGRES_DB:-ml_inference}
+  MLFLOW_TRACKING_URI: http://mlflow:5001
+  ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mlpipeline}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlpipeline}
+      POSTGRES_DB: ${POSTGRES_DB:-ml_inference}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mlpipeline} -d ${POSTGRES_DB:-ml_inference}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mlflow:
+    build: .
+    image: ml-inference-pipeline
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://${POSTGRES_USER:-mlpipeline}:${POSTGRES_PASSWORD:-mlpipeline}@postgres:5432/${POSTGRES_DB:-ml_inference}
+      --serve-artifacts --artifacts-destination /mlflow/artifacts
+      --host 0.0.0.0 --port 5001
+    ports:
+      - "5001:5001"
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:5001/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  train:
+    image: ml-inference-pipeline
+    command: python scripts/train.py
+    environment: *app-env
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: ml-inference-pipeline
+    environment: *app-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      train:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:

@@ -1,0 +1,18 @@
+1. Train three versions on data/raw/ai4i2020.csv
+   v1 default: precision 0.931 recall 0.794 f1 0.857 -> promoted to champion
+   v2 deeper trees: precision 0.932 recall 0.809 f1 0.866 -> promoted to champion
+   v3 weak model: precision 1.000 recall 0.015 f1 0.029 -> not promoted: precision 1.000 / recall 0.015 is below the gate (0.7 / 0.6)
+
+2. Registry: champion is v2 after the gate
+   manual promote of v3 -> champion v3
+   rollback -> champion v2
+   second rollback -> HTTP 409 (nothing left to roll back to)
+
+3. Replay 300 sample readings through POST /predict
+   flagged as failure: 7, rows in prediction log: 300
+   drift windows checked: True, alerts at webhook: 0
+
+4. Replay the same readings with +6 K on both temperatures (simulated sensor offset)
+   drift detected: True, features: ['air_temperature_k', 'process_temperature_k']
+   alerts at webhook: 1
+   alert text: Data drift on machine_failure_xgboost v2: air_temperature_k, process_temperature_k
